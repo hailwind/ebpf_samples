@@ -20,7 +20,7 @@ case ${ARCH} in
 x86_64)
 HDR_DIR=x86
 ;;
-x86_LOCAL)
+x86_local)
 HDR_DIR=local
 ;;
 x86_vcpe)
