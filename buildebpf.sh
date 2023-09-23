@@ -6,14 +6,27 @@ case ${ARCH} in
 arm64)
 CROSS_COMPILE=aarch64-linux-gnu-
 TARGET=bpf
+HDR_DIR=${ARCH}
 ;;
 arm)
 CROSS_COMPILE=arm-linux-gnueabi-
 TARGET=arm-linux-gnueabi
+HDR_DIR=${ARCH}
 ;;
 *)
 CROSS_COMPILE=x86_64-linux-gnu-
 TARGET=bpf
+case ${ARCH} in
+x86_64)
+HDR_DIR=x86
+;;
+x86_LOCAL)
+HDR_DIR=local
+;;
+x86_vcpe)
+HDR_DIR=vcpe
+;;
+esac
 ARCH=x86
 ;;
 esac
@@ -35,7 +48,7 @@ clang \
     -Wno-address-of-packed-member \
     -Wno-unused -Wall -Werror \
     -O2 -emit-llvm -c ${SRC} \
-    -I vmlinux/${ARCH} \
+    -I vmlinux/${HDR_DIR} \
     -o - | llc -march=bpf -filetype=obj -o ${BIN}
 }
 
