@@ -3,7 +3,7 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/vmlinux/x86",
+                "${workspaceFolder}/vmlinux/local",
                 "${workspaceFolder}/**",
             ],
             "defines": [],

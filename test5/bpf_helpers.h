@@ -1,73 +1,22 @@
-/* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
-#ifndef __BPF_HELPERS__
-#define __BPF_HELPERS__
+#ifndef __BPF_HELPERS_H
+#define __BPF_HELPERS_H
 
-/*
- * Note that bpf programs need to include either
- * vmlinux.h (auto-generated from BTF) or linux/types.h
- * in advance since bpf_helper_defs.h uses such types
- * as __u64.
+/* In Linux 5.4, asm_inline was introduced, which is not supported by clang.
+ * Ensure CONFIG_CC_HAS_ASM_INLINE is undefined so the macro in linux/compiler_types.h
+ * doesn't define 'asm_inline' as 'asm __inline'.
  */
-#include "bpf_helper_defs.h"
+#undef CONFIG_CC_HAS_ASM_INLINE
 
-#define __uint(name, val) int (*name)[val]
-#define __type(name, val) typeof(val) *name
-#define __array(name, val) typeof(val) *name[]
+// clang doesn't support '.syntax unified', so skip including asm/unified.h.
+// This was introduced somewhere before 4.19 and later fixed:
+// https://lkml.org/lkml/2019/8/29/1669.
+#define __ASM_UNIFIED_H
 
-/* Helper macro to print out debug messages */
-#define bpf_printk(fmt, ...)				\
-({							\
-	char ____fmt[] = fmt;				\
-	bpf_trace_printk(____fmt, sizeof(____fmt),	\
-			 ##__VA_ARGS__);		\
-})
-
-/*
- * Helper macro to place programs, maps, license in
+/* helper macro to place programs, maps, license in
  * different sections in elf_bpf file. Section names
  * are interpreted by elf_bpf loader
  */
 #define SEC(NAME) __attribute__((section(NAME), used))
-
-#ifndef __always_inline
-#define __always_inline __attribute__((always_inline))
-#endif
-#ifndef __noinline
-#define __noinline __attribute__((noinline))
-#endif
-#ifndef __weak
-#define __weak __attribute__((weak))
-#endif
-
-/*
- * Helper macro to manipulate data structures
- */
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER)	((unsigned long)&((TYPE *)0)->MEMBER)
-#endif
-#ifndef container_of
-#define container_of(ptr, type, member)				\
-	({							\
-		void *__mptr = (void *)(ptr);			\
-		((type *)(__mptr - offsetof(type, member)));	\
-	})
-#endif
-
-/*
- * Helper macro to throw a compilation error if __bpf_unreachable() gets
- * built into the resulting code. This works given BPF back end does not
- * implement __builtin_trap(). This is useful to assert that certain paths
- * of the program code are never used and hence eliminated by the compiler.
- *
- * For example, consider a switch statement that covers known cases used by
- * the program. __bpf_unreachable() can then reside in the default case. If
- * the program gets extended such that a case is not covered in the switch
- * statement, then it will throw a build error due to the default case not
- * being compiled out.
- */
-#ifndef __bpf_unreachable
-# define __bpf_unreachable()	__builtin_trap()
-#endif
 
 #define printt(fmt, ...)                                           \
 	({                                                             \
@@ -75,32 +24,101 @@
 		bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
 	})
 
+/* helper functions called from eBPF programs written in C */
+static void *(*bpf_map_lookup_elem)(void *map, void *key) =
+	(void *) BPF_FUNC_map_lookup_elem;
+static int (*bpf_map_update_elem)(void *map, void *key, void *value,
+				  unsigned long long flags) =
+	(void *) BPF_FUNC_map_update_elem;
+static int (*bpf_map_delete_elem)(void *map, void *key) =
+	(void *) BPF_FUNC_map_delete_elem;
+static int (*bpf_probe_read)(void *dst, int size, void *unsafe_ptr) =
+	(void *) BPF_FUNC_probe_read;
+static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
+  (void *) BPF_FUNC_skb_load_bytes;
+static unsigned long long (*bpf_ktime_get_ns)(void) =
+	(void *) BPF_FUNC_ktime_get_ns;
+static int (*bpf_trace_printk)(const char *fmt, int fmt_size, ...) =
+	(void *) BPF_FUNC_trace_printk;
+static unsigned long long (*bpf_get_smp_processor_id)(void) =
+	(void *) BPF_FUNC_get_smp_processor_id;
+static unsigned long long (*bpf_get_current_pid_tgid)(void) =
+	(void *) BPF_FUNC_get_current_pid_tgid;
+static unsigned long long (*bpf_get_current_uid_gid)(void) =
+	(void *) BPF_FUNC_get_current_uid_gid;
+static int (*bpf_get_current_comm)(void *buf, int buf_size) =
+	(void *) BPF_FUNC_get_current_comm;
+static int (*bpf_perf_event_read)(void *map, int index) =
+	(void *) BPF_FUNC_perf_event_read;
+static int (*bpf_clone_redirect)(void *ctx, int ifindex, int flags) =
+	(void *) BPF_FUNC_clone_redirect;
+static int (*bpf_redirect)(int ifindex, int flags) =
+	(void *) BPF_FUNC_redirect;
+static int (*bpf_perf_event_output)(void *ctx, void *map,
+				    unsigned long long flags, void *data,
+				    int size) =
+	(void *) BPF_FUNC_perf_event_output;
+static int (*bpf_skb_get_tunnel_key)(void *ctx, void *key, int size, int flags) =
+	(void *) BPF_FUNC_skb_get_tunnel_key;
+static int (*bpf_skb_set_tunnel_key)(void *ctx, void *key, int size, int flags) =
+	(void *) BPF_FUNC_skb_set_tunnel_key;
+static unsigned long long (*bpf_get_prandom_u32)(void) =
+	(void *) BPF_FUNC_get_prandom_u32;
 
-/*
- * Helper structure used by eBPF C program
- * to describe BPF map attributes to libbpf loader
+/* a helper structure used by eBPF C program
+ * to describe map attributes to elf_bpf loader
  */
+#define BUF_SIZE_MAP_NS 256
+
 struct bpf_map_def {
 	unsigned int type;
 	unsigned int key_size;
 	unsigned int value_size;
 	unsigned int max_entries;
 	unsigned int map_flags;
+	unsigned int pinning;
+	char namespace[BUF_SIZE_MAP_NS];
 };
 
-enum libbpf_pin_type {
-	LIBBPF_PIN_NONE,
-	/* PIN_BY_NAME: pin maps by name (in /sys/fs/bpf by default) */
-	LIBBPF_PIN_BY_NAME,
-};
+#if defined(__TARGET_ARCH_x86)
 
-enum libbpf_tristate {
-	TRI_NO = 0,
-	TRI_YES = 1,
-	TRI_MODULE = 2,
-};
+#define PT_REGS_PARM1(x) ((x)->di)
+#define PT_REGS_PARM2(x) ((x)->si)
+#define PT_REGS_PARM3(x) ((x)->dx)
+#define PT_REGS_PARM4(x) ((x)->cx)
+#define PT_REGS_PARM5(x) ((x)->r8)
+#define PT_REGS_RET(x) ((x)->sp)
+#define PT_REGS_FP(x) ((x)->bp)
+#define PT_REGS_RC(x) ((x)->ax)
+#define PT_REGS_SP(x) ((x)->sp)
+#define PT_REGS_IP(x) ((x)->ip)
 
-#define __kconfig __attribute__((section(".kconfig")))
-#define __ksym __attribute__((section(".ksyms")))
+#elif defined(__TARGET_ARCH_arm)
+
+#define PT_REGS_PARM1(x) ((x)->uregs[0])
+#define PT_REGS_PARM2(x) ((x)->uregs[1])
+#define PT_REGS_PARM3(x) ((x)->uregs[2])
+#define PT_REGS_PARM4(x) ((x)->uregs[3])
+#define PT_REGS_PARM5(x) ((x)->uregs[4])
+#define PT_REGS_RET(x) ((x)->uregs[14])
+#define PT_REGS_FP(x) ((x)->uregs[11]) /* Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x) ((x)->uregs[0])
+#define PT_REGS_SP(x) ((x)->uregs[13])
+#define PT_REGS_IP(x) ((x)->uregs[12])
+
+#elif defined(__TARGET_ARCH_arm64)
+
+#define PT_REGS_PARM1(x) ((x)->regs[0])
+#define PT_REGS_PARM2(x) ((x)->regs[1])
+#define PT_REGS_PARM3(x) ((x)->regs[2])
+#define PT_REGS_PARM4(x) ((x)->regs[3])
+#define PT_REGS_PARM5(x) ((x)->regs[4])
+#define PT_REGS_RET(x) ((x)->regs[30])
+#define PT_REGS_FP(x) ((x)->regs[29]) /* Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x) ((x)->regs[0])
+#define PT_REGS_SP(x) ((x)->sp)
+#define PT_REGS_IP(x) ((x)->pc)
+
+#endif
 
 #endif

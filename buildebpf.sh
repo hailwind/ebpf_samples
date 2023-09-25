@@ -37,9 +37,9 @@ clang \
     -target ${TARGET} \
     -D__TARGET_ARCH_${ARCH} \
     -D__KERNEL__ -D__BPF_TRACING__ \
+    -fno-stack-protector \
     -Wno-implicit-int \
     -Wno-int-conversion \
-    -fno-stack-protector \
     -Wno-int-to-pointer-cast \
     -Wno-incompatible-pointer-types \
     -Wno-unknown-attributes \
