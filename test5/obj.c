@@ -175,12 +175,13 @@ int  bpf_prog1(struct xdp_md *ctx) {
         if ( offset+sizeof(struct tls_extension) < 512 ) {
             struct tls_extension *ext = &payload.buff[offset];
             printt("type %02x len: %u", ext->type, bpf_ntohs(ext->len));
+            offset+=sizeof(struct tls_extension);
             if (ext->type == TLS_EXT_SERVER_NAME) {
-                offset+=sizeof(struct tls_extension);
                 if ( offset+sizeof(struct tls_server_name) < 512 ) {
                     struct tls_server_name *servername = &payload.buff[offset];
                     u16 server_name_len =bpf_ntohs(servername->server_name_len);
                     printt("list_len: %u len: %u", servername->server_name_type, server_name_len);
+                    printt("server_name: %s", servername->domain);
                     // offset+=sizeof(struct tls_server_name);
                     // if ( offset+server_name_len < 512 ) {
                     //     bpf_probe_read(&domain, server_name_len, &payload.buff[offset]);
@@ -190,8 +191,6 @@ int  bpf_prog1(struct xdp_md *ctx) {
                 }else{
                     return XDP_PASS;
                 }
-            }else{
-                continue;
             }
         }else{
             return XDP_PASS;
